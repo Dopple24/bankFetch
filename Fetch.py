@@ -56,17 +56,25 @@ def matchName(fullName, comment, namesDatabase, volume, paymentReason):
     column = cell.col
     databaseSurname = ""
     dangerLevel = "ERROR"
-
-    for databaseName in namesDatabase:
-        databaseSurname = databaseName.get("surname")
-        databaseFirstName = databaseName.get("name")
-        databaseID = databaseName.get("id")
-        if (databaseSurname.lower() == surname and databaseFirstName.lower() == firstName) or (commentExists and (databaseSurname.lower() == commentSurname and databaseFirstName.lower() == commentFirstName)):
-            matchEntry = [databaseSurname, databaseID, databaseFirstName, comment]
-            matchingSurnames.append(matchEntry)
-            dangerLevel = "INFO"
+    if commentExists:
+        for databaseName in namesDatabase:
+            databaseSurname = databaseName.get("surname")
+            databaseFirstName = databaseName.get("name")
+            databaseID = databaseName.get("id")
+            if (databaseSurname.lower() == commentSurname and databaseFirstName.lower() == commentFirstName) or (databaseSurname.lower() == commentFirstName and databaseFirstName.lower() == commentSurname):
+                matchEntry = [databaseSurname, databaseID, databaseFirstName, comment]
+                matchingSurnames.append(matchEntry)
+                dangerLevel = "INFO"
     if len(matchingSurnames) == 0:
-        matchRound = 2
+        for databaseName in namesDatabase:
+            databaseSurname = databaseName.get("surname")
+            databaseFirstName = databaseName.get("name")
+            databaseID = databaseName.get("id")
+            if databaseSurname.lower() == surname and databaseFirstName.lower() == firstName:
+                matchEntry = [databaseSurname, databaseID, databaseFirstName, comment]
+                matchingSurnames.append(matchEntry)
+                dangerLevel = "INFO"
+    if len(matchingSurnames) == 0:
         for databaseName in namesDatabase:
             databaseSurname = databaseName.get("surname")
             databaseFirstName = databaseName.get("name")
@@ -129,5 +137,3 @@ except requests.exceptions.RequestException as e:
     print(f"Network or API error: {e}")
 except (KeyError, IndexError) as e:
     print(f"Data parsing error: {e}")
-
-
