@@ -11,6 +11,29 @@ sheet = client.open("python source").sheet1  # 'sheet1' is the first tab
 
 records = sheet.get_all_records()
 
+load_dotenv()
+WEBHOOK_URL = os.getenv("DISCORD_API_URL")
+
+def send_discord_message(message, level="info"):
+    color_map = {
+        "info": 0x3498db,    # Blue
+        "warning": 0xf1c40f, # Yellow
+        "error": 0xe74c3c    # Red
+    }
+    color = color_map.get(level.lower(), 0x3498db)
+
+    data = {
+        "embeds": [{
+            "title": level.upper(),
+            "description": message,
+            "color": color
+        }]
+    }
+
+    response = requests.post(WEBHOOK_URL, json=data)
+    if response.status_code != 204:
+        print("Failed to send message:", response.text)
+
 def matchName(fullName, comment, namesDatabase, volume, paymentReason):
     fullName = fullName.lower().split()
     comment = comment.lower().split()
@@ -32,18 +55,21 @@ def matchName(fullName, comment, namesDatabase, volume, paymentReason):
     cell = sheet.find(paymentReason)
     column = cell.col
     databaseSurname = ""
+    dangerLevel = "ERROR"
 
     for databaseName in namesDatabase:
         databaseSurname = databaseName.get("surname")
         databaseFirstName = databaseName.get("name")
         databaseID = databaseName.get("id")
         if (databaseSurname.lower() == surname and databaseFirstName.lower() == firstName) or (commentExists and (databaseSurname.lower() == commentSurname and databaseFirstName.lower() == commentFirstName)):
-            print(databaseSurname)
-            matchEntry = [databaseSurname, databaseID]
+            matchEntry = [databaseSurname, databaseID, databaseFirstName, comment]
             matchingSurnames.append(matchEntry)
+            dangerLevel = "INFO"
     if len(matchingSurnames) == 0:
+        matchRound = 2
         for databaseName in namesDatabase:
             databaseSurname = databaseName.get("surname")
+            databaseFirstName = databaseName.get("name")
             databaseID = databaseName.get("id")
             sameSurname = databaseSurname
             matchingSurnames = []
@@ -52,28 +78,27 @@ def matchName(fullName, comment, namesDatabase, volume, paymentReason):
                     sameSurname = ""
                     break
             if sameSurname:
-                print(databaseSurname)
-                matchEntry = [databaseSurname, databaseID]
+                matchEntry = [databaseSurname, databaseID, databaseFirstName, comment]
                 matchingSurnames.append(matchEntry)
-    print(matchingSurnames)
+                dangerLevel = "WARNING"
 
     if len(matchingSurnames) == 1:
         databaseSurname = matchingSurnames[0][0]
         databaseID = matchingSurnames[0][1]
+        databaseFirstName = matchingSurnames[0][2]
+        comment = matchingSurnames[0][3]
         value = sheet.cell(databaseID + 1, column).value
         if value is None:
             value = 0.0
         sheet.update_cell(databaseID + 1, column, float(value) + volume)
+        send_discord_message(f"Payment matched with exactly 1 database name \nname: {databaseFirstName} {databaseSurname} \nid: {databaseID} \ncomment: {comment} \nvolume: {volume}", dangerLevel)
 
     elif len(matchingSurnames) == 0:
-        print("No match found")
+        send_discord_message(f"Payment matched with no database name \nsender name: {fullName} \ncomment: {comment} \nvolume: {volume}", "ERROR")
 
     else:
-        print("Multiple matches found")
-        for match in matchingSurnames:
-            print(match)
+        send_discord_message(f"Payment matched with multiple database name \nsender name: {fullName} \ncomment: {comment} \nvolume: {volume}","ERROR")
 
-load_dotenv()
 api_key = os.getenv("BANK_API_KEY")
 
 try:
